@@ -1,0 +1,119 @@
+/************************************************************************
+// El codigo que se expone a continuación corresponde a Módulos Remotos
+// compuestos por un Node Mcu (ESP8266)encargados de obtener datos de: 
+//             1º Humedad del aire (%).
+//             2º Temperatura (ºC).
+//             3º Humedad del suelo (%).
+// Toda la información recopilada por el módulo podrá ser visualizada a 
+// través de la app movil Blynk (http://www.blynk.cc)
+
+//  Blynk setup:
+//  Mostrar valores asociados a V5 (Humedad del aire)
+//  Mostrar valores asociados a V6 (Temoeratura del aire)
+//  Mostrar valores asociados a V7 (Humedad del suelo)
+ **************************************************************/
+
+#define BLYNK_PRINT Serial // Comment this out to disable prints and save space
+
+//Librerias Incluidas
+#include <SPI.h>
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <SimpleTimer.h>
+#include <DHT.h>
+
+// Codigo de autentificación proporcionado por la aplicación Blynk
+// Project -> Project Settings -> Auth Tokens -> Copy all.
+char auth[] = "8aec67bed21d4c2b86a69256297ef3a1";
+
+// SSID y constraseña de la red WiFi a utilizar
+// Si se trata de una red de uso libre pass[] = ""
+char ssid[] = "Q6JAVIER";
+char pass[] = "1234567890";
+
+#define DHTPIN 2 // Sensor DHT conectado al pin digital 2 (D4) del Node Mcu. 
+
+// Definir el tipo de sensor qeu se está utilizando
+//#define DHTTYPE DHT11     // DHT 11
+#define DHTTYPE DHT22   // DHT 22, AM2302, AM2321
+//#define DHTTYPE DHT21   // DHT 21, AM2301
+
+DHT dht(DHTPIN, DHTTYPE);
+SimpleTimer timer;
+
+int sense_Pin = 0; // Sensor de humedad del suelo conectado al pin analógico 0 (A0)
+int value = 0; // Definimo val=0 para obtener posteriormente los valores de lectura 
+               // del sensor de humedad del suelo
+int led = 5;// Led situado en el pin digital 5 (D1)
+
+void setup()
+{
+  Serial.begin(9600); // See the connection status in Serial Monitor
+  Blynk.begin(auth, ssid, pass); // Autentificación usuario y contraseña
+  dht.begin(); // Inicialización sensor dht
+  Serial.print("Módulo Wifi ESP"); // Imprimimos en el monitor serial el dispositivo 
+                                   // con el que trabajamo 
+  pinMode(led, OUTPUT); // Definimos el LED como un dispositivo de salida
+  delay(2000);
+  // La función sendSensor se ejecutará cada segundo. 
+  timer.setInterval(1000L, sendSensor);
+}
+
+void loop()
+{
+  Blynk.run(); // Initiates Blynk
+  timer.run(); // Initiates SimpleTimer
+  // Recopilación de datos por parte del sensor DHT 22 que mide Humedad del Aire y 
+  // Temperatura.y muestra de los mismos en el monitor serial.
+   float h = dht.readHumidity();
+   float t = dht.readTemperature();         
+   Serial.print("Humedad del Aire = ");
+   Serial.print(h);
+   Serial.println("%  ");
+   Serial.print("Temperatura = ");
+   Serial.print(t); 
+   Serial.println("ºC  ");
+   // Recopilación de datos por parte del sensor de Humedad del Suelo.
+   // y muestra de los mismos en el monitor serial.
+   Serial.print("Humedad del Suelo : ");
+   value= analogRead(sense_Pin);
+   value=(value/6); // El sensor muestra datos entre 0 (totalmente seco) y 600 (agua) 
+                    // por lo que para expresar los datos en % entre 0 y 100 
+                    // dividimos los datos "virgenes" entre 6
+   Serial.print(value);
+   Serial.println("%  ");
+   delay(2000);
+   // Parpadeo del LED que indica el buen funcionamiento del Módulos Wifi ESP
+   digitalWrite(led, HIGH); 
+   delay(1000); 
+   digitalWrite(led, LOW); 
+   delay(1000); 
+}
+
+
+// Esta función(void sendSensor) será la encargada de enviar los valores de lectura 
+// de los sensores a los pines virtuales de la app Blynk (V5, V6, V7). En la 
+// aplicación puede escogerse la frecuencia con la que se desean recibir estos datos
+
+void sendSensor()
+{
+  // Recopilación de datos por parte del sensor DHT 22 que mide Humedad del Aire y 
+  // Temperatura.
+  float h = dht.readHumidity();
+  float t = dht.readTemperature(); // o dht.readTemperature(true) para grados 
+                                   // Fahrenheit
+  value= analogRead(sense_Pin);
+  value=(value/6); // El sensor muestra valores entre 0 (totalmente seco) y 600 (agua) 
+                   // por lo qeu para expresar los datos en % dividimos los datos 
+                   // "virgenes" entre 6
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  // 
+  // No es recomendable mandar mas de 10 valores por segundo
+  Blynk.virtualWrite(V5, h);
+  Blynk.virtualWrite(V6, t);
+  Blynk.virtualWrite(V7, value);
+}

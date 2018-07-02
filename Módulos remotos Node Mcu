@@ -16,6 +16,7 @@
 #define BLYNK_PRINT Serial // Comment this out to disable prints and save space
 
 //Librerias Incluidas
+#include <SD.h>
 #include <SPI.h>
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -32,7 +33,7 @@ char ssid[] = "Q6JAVIER";
 char pass[] = "1234567890";
 
 #define DHTPIN 2 // Sensor DHT conectado al pin digital 2 (D4) del Node Mcu. 
-
+#define CS_PIN  15 // SD conectada al pin digital 15 (D8) del Node Mcu. 
 // Definir el tipo de sensor qeu se está utilizando
 //#define DHTTYPE DHT11     // DHT 11
 #define DHTTYPE DHT22   // DHT 22, AM2302, AM2321
@@ -49,6 +50,14 @@ int led = 5;// Led situado en el pin digital 5 (D1)
 void setup()
 {
   Serial.begin(9600); // See the connection status in Serial Monitor
+  Serial.print("Inicialización Tarjeta SD...");
+  // Verificación de qeu la tarjeta sd está conectada
+  if (!SD.begin(CS_PIN)) {
+    Serial.println("Verificar que la tarjeta SD esté presente");
+    return;
+  }
+  //Si llega a este punto es por que la tarjeta SD ha sido reconocida
+  Serial.println("Tarjeta inicializada.");
   Blynk.begin(auth, ssid, pass); // Autentificación usuario y contraseña
   dht.begin(); // Inicialización sensor dht
   Serial.print("Módulo Wifi ESP"); // Imprimimos en el monitor serial el dispositivo 
@@ -82,6 +91,24 @@ void loop()
                     // dividimos los datos "virgenes" entre 6
    Serial.print(value);
    Serial.println("%  ");
+   // Guardamos los valores de temperatura, humedad y humedad de suelo en 
+   // una tarjeta micro SD
+   File dataFile = SD.open("SD.txt", FILE_WRITE);
+  // Si el archivo ha sido abierto correctamente se escriben los datos en el
+  if (dataFile) {
+    Serial.println("Apertura de archivo correcta");
+      dataFile.print(h);
+      dataFile.print(" | ");
+      dataFile.println(t);
+      dataFile.print(" | ");
+      dataFile.println(value);
+      //Despues de copiar los datos, e cierra el archivo
+      dataFile.close();
+  }
+  // Si el arhivo no puede abrirse, los datos no podrán ser grabados
+  else {
+    Serial.println("No puede abrirse el archivo SD.txt");
+  }
    delay(2000);
    // Parpadeo del LED que indica el buen funcionamiento del Módulos Wifi ESP
    digitalWrite(led, HIGH); 
@@ -117,3 +144,4 @@ void sendSensor()
   Blynk.virtualWrite(V6, t);
   Blynk.virtualWrite(V7, value);
 }
+

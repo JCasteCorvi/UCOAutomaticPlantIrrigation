@@ -1,0 +1,96 @@
+/*********************************************************************
+/ El código que se expone a continuación corresponde al Módulo Central
+/ compuesto por un Node Mcu (ESP8266) y encargados de actuar sobre la 
+/ electroválvula que regula el flujo de agua a través del sistema 
+/ riego por goteo.
+*********************************************************************/
+
+/*********************************************************************
+*************************Librerías Incluidas**************************
+*********************************************************************/
+
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+
+int ValvleLEDPin = 6;// Led que indica el funcionamiento de la 
+                     // electroválvula
+int ValvlePin = 7;   // Pin al que está conectado el módulo relé
+                     // que controla la electroválvula.
+                     
+// Comunicación CLIENT-SERVER//
+String  i;          
+long  HumedadSuelo;
+String  httpurl;
+String  TheHiddenAnswerOfClient;
+HTTPClient http;
+String SendWithAnswer(String IPcache, String monmessagecache) {
+httpurl = "http://";
+httpurl+=IPcache;
+httpurl+="/";
+httpurl+=monmessagecache;
+http.begin(httpurl);
+http.GET();
+TheHiddenAnswerOfClient = (http.getString());
+http.end();
+return TheHiddenAnswerOfClient;
+}
+
+void setup()
+{
+  i = "";
+  HumedadSuelo = 0;
+  Serial.begin(9600);
+  WiFi.disconnect();
+  delay(3000);
+   WiFi.begin("Q6JAVIER","1234567890");
+  while ((!(WiFi.status() == WL_CONNECTED))){
+    delay(300);
+  }
+  
+  Serial.println("Connected");
+  pinMode(ValvleLEDPin, OUTPUT);
+  pinMode(ValvlePin, OUTPUT);
+}
+
+
+
+
+void loop()
+{
+    i = (SendWithAnswer("192.168.43.196","Yes"));
+    // Mensaje "virgen"
+    Serial.println(" Valor Humedad de suelo antes de aclarar");
+    Serial.println(i);
+    // Mensaje limpio, solo muestra el valor del contenido de 
+    // humedad de suelo.
+    Serial.println("Después de Aclarar"); 
+    i.remove(0, 25);
+    i.remove(i.length()-11,11);
+    Serial.println(i);
+    // Transformamos el texto en Integer para convertirlo en un 
+    // valor con el que operar
+    HumedadSuelo = i.toInt();
+    Serial.println((HumedadSuelo / 6));
+    // El sensor muestra datos entre 0 (totalmente seco)
+    // y 600 (agua) por lo que para expresar los datos en
+    // % entre 0 y 100 dividimos los datos "vírgenes" entre
+    // 6 y mostramos el resultado en el monitor serial. 
+    if (HumedadSuelo <= 350) { // Suelo Seco, 
+                               // activar electroválvula
+      Serial.print ("Suelo Seco // ");
+      digitalWrite(ValvlePin, LOW); 
+      // El módulo relé presenta una lógica inversa
+      // LOW = Dispositivo conectado funcionando
+      // HIGH = Dispositivo conectado apagado
+      digitalWrite(ValvleLEDPin, HIGH);
+    }
+    else {
+      Serial.print ("Suelo en Buen Estado // ");
+      // Suelo en buen estado, desactivar 
+      // electroválvula
+      digitalWrite(ValvlePin, HIGH);
+      digitalWrite(ValvleLEDPin,LOW);
+    }
+    delay(5000);
+
+}
